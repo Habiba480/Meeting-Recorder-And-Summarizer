@@ -2,12 +2,13 @@ import streamlit as st
 import tempfile
 import os
 import requests
-import  moviepy
 from moviepy import VideoFileClip
 
 from src.ui_module import set_page_config_and_style, setup_sidebar
 from src.whisper_module import load_whisper_model
 from src.llm_module import LLM_API_URL, MODEL_NAME
+
+from src.diarize import diarize_audio
 
 # UI setup
 set_page_config_and_style()
@@ -16,7 +17,7 @@ setup_sidebar()
 # Load Whisper model
 whisper_model = load_whisper_model()
 
-# Sidebar for saved chat titles (already handled in ui_module too)
+# Sidebar for saved chat titles
 for title in st.session_state.chat_titles:
     if st.sidebar.button(title):
         st.session_state.current_chat = title
@@ -45,23 +46,50 @@ if uploaded_file:
     else:
         audio_path = temp_file_path
 
-    # Transcribe audio using Whisper
+    #  Speaker Diarization
+    st.info("Identifying who spoke when...")
+    diarized_segments = diarize_audio(audio_path, num_speakers=2)  # You can later detect this dynamically
+
+    # Whisper transcription
     st.info("Transcribing audio, please wait...")
     segments, _ = whisper_model.transcribe(audio_path)
-    full_transcript = "\n".join(segment.text for segment in segments)
+    whisper_segments = [
+        {
+            "start": s.start,
+            "end": s.end,
+            "text": s.text.strip()
+        }
+        for s in segments
+    ]
 
-    # Display transcript
-    st.subheader("Full Transcript")
-    st.text_area("Transcript", full_transcript, height=300)
+    # Step 3: Align transcription to speakers
+    st.info("Aligning transcription with speakers...")
+    final_transcript = []
 
-    # Generate summary with LLM
+    for dseg in diarized_segments:
+        speaker_text = ""
+        for wseg in whisper_segments:
+            # If there's overlap between diarized segment and Whisper segment
+            if not (wseg["end"] < dseg["start"] or wseg["start"] > dseg["end"]):
+                speaker_text += " " + wseg["text"]
+        dseg["text"] = speaker_text.strip()
+        if dseg["text"]:  # only add non-empty
+            final_transcript.append(f"{dseg['speaker']}: {dseg['text']}")
+
+    speaker_transcript = "\n".join(final_transcript)
+
+    # Display speaker-attributed transcript
+    st.subheader("️ Speaker-Attributed Transcript")
+    st.text_area("Transcript", speaker_transcript, height=300)
+
+    # Step 4: Summarization
     if st.button("Generate Summary"):
         st.info("Summarizing meeting...")
         try:
             response = requests.post(LLM_API_URL, json={
                 "model": MODEL_NAME,
                 "messages": [
-                    {"role": "user", "content": f"Please summarize the following meeting:\n\n{full_transcript}"}
+                    {"role": "user", "content": f"Please summarize the following meeting transcript with speaker information:\n\n{speaker_transcript}"}
                 ]
             })
             response.raise_for_status()
@@ -69,11 +97,11 @@ if uploaded_file:
             st.subheader("Meeting Summary")
             st.text_area("Summary", summary, height=250)
 
-            # Save chat to history
+            # Save chat
             new_title = f"Chat {len(st.session_state.chat_titles)+1}"
             st.session_state.chat_titles.append(new_title)
             st.session_state[new_title] = {
-                "transcript": full_transcript,
+                "transcript": speaker_transcript,
                 "summary": summary
             }
 

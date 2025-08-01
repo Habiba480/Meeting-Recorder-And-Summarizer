@@ -1,2 +1,2 @@
-LLM_API_URL = "http://localhost:1234/v1/chat/completions"
-MODEL_NAME = "meta-llama/Meta-Llama-3-8B-Instruct"
+LLM_API_URL = "http://192.168.1.5:1234"
+MODEL_NAME = "meta-llama-3.1-8b-instruct"
