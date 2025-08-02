@@ -1,0 +1,8 @@
+numpy~=1.26.4
+Resemblyzer~=0.1.4
+pathlib~=1.0.1
+scikit-learn~=1.7.0
+streamlit~=1.47.0
+faster-whisper~=1.1.1
+requests~=2.32.4
+moviepy~=2.2.1
