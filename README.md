@@ -1,6 +1,3 @@
-Here’s a **fully polished, professional, and copy-ready** version of the `README.md`, especially improving the *Usage*, *Structure*, and *Dependencies* sections after Installation:
-
----
 
 # Meeting Recorder and Summarizer
 
